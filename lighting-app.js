@@ -7,12 +7,12 @@
   "use strict";
 
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  var LS_KEY = "lightingControl.v3";
+  var LS_KEY = "lightingControl.v4";
 
   /* ---------- default state ---------- */
   function zoneDefaults() {
     return {
-      schedule: { on: "09:00", off: "19:00", days: [1, 2, 3, 4, 5] },
+      schedule: { on: "09:00", off: "19:00", days: [0, 1, 2, 3, 4, 5, 6] }, // seeded as-is: every day, like the current program
       exceptions: [{ date: "2026-06-13", mode: "skip" }],
       occupancy: { enabled: true, timeout: 15 },
       daylight: { enabled: true, threshold: 400 },
@@ -355,8 +355,8 @@
     render();
   });
   $("#resetSchedule").addEventListener("click", function () {
-    z().schedule = { on: "09:00", off: "19:00", days: [1, 2, 3, 4, 5] };
-    pushLog("Reset " + state.zone + " schedule to default (09:00–19:00, Mon–Fri).", "config");
+    z().schedule = { on: "09:00", off: "19:00", days: [0, 1, 2, 3, 4, 5, 6] };
+    pushLog("Reset " + state.zone + " schedule to the migrated default (09:00–19:00, every day).", "config");
     toast("Schedule reset"); render();
   });
 
