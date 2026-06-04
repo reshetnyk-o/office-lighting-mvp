@@ -75,6 +75,7 @@
   function pushLog(text, type) {
     state.log.unshift(logEntry(text, user(), type));
     if (state.log.length > 60) state.log.length = 60;
+    renderLog(); // keep the Activity log live — no refresh needed
   }
 
   /* ---------- the decision engine (mirrors spec §3.2) ---------- */
