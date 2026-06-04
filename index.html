@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lighting Control — Office Smart Lighting</title>
+<link rel="stylesheet" href="report-styles.css">
+<link rel="stylesheet" href="lighting-app.css">
+</head>
+<body data-role="editor">
+<div class="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="bm" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#2e7df6"/><stop offset="0.5" stop-color="#46c08a"/><stop offset="1" stop-color="#f6b73c"/>
+          </linearGradient>
+        </defs>
+        <path d="M16 3c-5 0-9 3.9-9 9 0 3.3 1.7 5.6 3.5 7.4 1 1 1.5 1.8 1.6 3.1h7.8c.1-1.3.6-2.1 1.6-3.1C24.3 17.6 26 15.3 26 12c0-5.1-4-9-10-9Z" stroke="url(#bm)" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M12 26h8M13 29h6" stroke="url(#bm)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-name">Lighting&nbsp;Control</span>
+      <span style="margin-left:10px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.14);color:#f5a623;border:1px solid rgba(245,158,11,.35);">Demo — not connected to real hardware</span>
+    </div>
+    <div class="topbar-right">
+      <select class="select" id="zoneSel" aria-label="Zone">
+        <option value="Floor 2 — Open space">Floor 2 — Open space</option>
+        <option value="Floor 2 — Meeting rooms">Floor 2 — Meeting rooms</option>
+        <option value="Floor 3 — Open space">Floor 3 — Open space</option>
+        <option value="Reception">Reception</option>
+      </select>
+      <div class="role-switch" role="group" aria-label="Role">
+        <button id="roleEditor" class="active">Editor</button>
+        <button id="roleViewer">View-only</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LAYOUT ============ -->
+  <div class="layout">
+
+    <!-- ===== RAIL: live status + simulation ===== -->
+    <aside class="rail">
+      <div class="status" id="status" data-state="ON">
+        <div class="bulb-wrap">
+          <div class="bulb-glow"></div>
+          <svg class="bulb" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="bulbg" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#f6b73c"/><stop offset="1" stop-color="#f0922f"/>
+              </linearGradient>
+            </defs>
+            <path d="M48 14c-13 0-23 10-23 23 0 8.5 4.3 14.5 9 19 2.6 2.5 4 5 4.2 8h19.6c.2-3 1.6-5.5 4.2-8 4.7-4.5 9-10.5 9-19 0-13-10-23-23-23Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" id="bulbGlass"/>
+            <path d="M39 70h18M41 78h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <path d="M41 44l5 6 4-9 5 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="status-state on" id="statusState">ON</div>
+        <div class="status-zone" id="statusZone">Floor 2 — Open space</div>
+        <div class="status-reason" id="statusReason">—</div>
+
+        <div class="trace">
+          <div class="trace-h">Decision trace · priority order</div>
+          <div class="trace-step" data-rule="override"><span class="ts-dot"></span>Manual override</div>
+          <div class="trace-step" data-rule="window"><span class="ts-dot"></span>Inside scheduled window</div>
+          <div class="trace-step" data-rule="occupancy"><span class="ts-dot"></span>Office occupied</div>
+          <div class="trace-step" data-rule="daylight"><span class="ts-dot"></span>Daylight check</div>
+          <div class="trace-step" data-rule="on"><span class="ts-dot"></span>Scheduled ON</div>
+        </div>
+      </div>
+
+      <!-- simulation panel -->
+      <div class="sim">
+        <div class="sim-h">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>
+          Live simulation
+        </div>
+        <p class="sim-note">This is the "real world" the engine reacts to — adjust it to watch the rules fire. (Demo only; production reads sensors + a clock.)</p>
+
+        <div class="field">
+          <div class="field-row"><label for="simDate">Date</label></div>
+          <input type="date" id="simDate" value="2026-06-08">
+        </div>
+
+        <div class="field">
+          <div class="field-row"><label for="simTime">Time of day</label><span class="val" id="simTimeVal">10:00</span></div>
+          <input type="range" id="simTime" min="0" max="1439" step="5" value="600">
+        </div>
+
+        <div class="field">
+          <div class="field-row"><label for="simOcc">Office occupied</label>
+            <label class="toggle"><input type="checkbox" id="simOcc" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row"><label for="simLux">Daylight</label><span class="val" id="simLuxVal">220 lux</span></div>
+          <input type="range" id="simLux" min="0" max="1200" step="20" value="220">
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+      <div class="viewer-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        You have <b>view-only</b> access. Ask your admin for edit rights to change the schedule.
+      </div>
+
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="schedule">Schedule</button>
+        <button class="tab" data-tab="exceptions">Exceptions<span class="badge" id="excBadge">0</span></button>
+        <button class="tab" data-tab="settings">Energy settings</button>
+        <button class="tab" data-tab="override">Override</button>
+        <button class="tab" data-tab="activity">Activity log</button>
+      </div>
+
+      <!-- SCHEDULE -->
+      <section class="panel active" data-panel="schedule">
+        <div class="panel-head">
+          <div>
+            <h2>Daily <b>schedule</b></h2>
+            <p>Set when lights turn on and off, and which days the schedule runs. Changes take effect on the next cycle (~1 min) — no developer, no deployment.</p>
+          </div>
+        </div>
+        <div class="field-card editable">
+          <div class="time-inputs">
+            <div class="time-field">
+              <label for="onTime">Turn ON time</label>
+              <input type="time" id="onTime" value="09:00">
+            </div>
+            <div class="time-field">
+              <label for="offTime">Turn OFF time</label>
+              <input type="time" id="offTime" value="19:00">
+            </div>
+          </div>
+        </div>
+        <div class="field-card editable">
+          <h3 style="margin-bottom:6px;">Active days</h3>
+          <p class="fc-desc">Lights only follow the schedule on the days you select.</p>
+          <div class="days" id="daysRow"></div>
+        </div>
+        <div class="actions editable">
+          <button class="btn btn-primary" id="saveSchedule">Save schedule</button>
+          <button class="btn btn-ghost" id="resetSchedule">Reset to 09:00–19:00, Mon–Fri</button>
+          <span class="saved-flag" id="schedSaved">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>Saved
+          </span>
+        </div>
+      </section>
+
+      <!-- EXCEPTIONS -->
+      <section class="panel" data-panel="exceptions">
+        <div class="panel-head">
+          <div>
+            <h2>Holiday &amp; <b>exception</b> dates</h2>
+            <p>Override the regular schedule on specific dates — skip a public holiday, or set custom hours for a one-off event.</p>
+          </div>
+        </div>
+        <div class="field-card editable">
+          <div class="time-inputs" style="align-items:flex-end;">
+            <div class="time-field"><label for="excDate">Date</label><input type="date" id="excDate"></div>
+            <div class="time-field"><label for="excMode">Behavior</label>
+              <select class="inp" id="excMode">
+                <option value="skip">Skip — lights off all day</option>
+                <option value="custom">Custom hours</option>
+              </select>
+            </div>
+            <div class="time-field" id="excCustomWrap" style="display:none;">
+              <label for="excCustom">Custom hours</label>
+              <div style="display:flex;gap:8px;">
+                <input type="time" id="excOn" value="10:00"><input type="time" id="excOff" value="16:00">
+              </div>
+            </div>
+            <button class="btn btn-primary" id="addExc" style="flex:none;">Add date</button>
+          </div>
+        </div>
+        <div class="exc-list" id="excList"></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="panel" data-panel="settings">
+        <div class="panel-head">
+          <div>
+            <h2>Energy-saving <b>settings</b></h2>
+            <p>Optional. When sensors are available, the lights react to whether people are present and how bright it already is. If a sensor feed drops, the system safely falls back to the plain schedule.</p>
+          </div>
+        </div>
+
+        <div class="field-card editable">
+          <div class="fc-head">
+            <h3>Occupancy auto-off</h3>
+            <label class="toggle"><input type="checkbox" id="occEnabled" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <p class="fc-desc">Switch lights off after a period of no movement during scheduled hours.</p>
+          <div class="field" id="occTimeoutWrap">
+            <div class="field-row"><label for="occTimeout">No-movement timeout</label><span class="val" id="occTimeoutVal">15 min</span></div>
+            <input type="range" id="occTimeout" min="5" max="60" step="5" value="15">
+          </div>
+        </div>
+
+        <div class="field-card editable">
+          <div class="fc-head">
+            <h3>Use natural light</h3>
+            <label class="toggle"><input type="checkbox" id="dlEnabled" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <p class="fc-desc">Keep lights off or dimmed when daylight already exceeds the threshold below.</p>
+          <div class="field" id="dlThreshWrap">
+            <div class="field-row"><label for="dlThresh">Daylight threshold</label><span class="val" id="dlThreshVal">400 lux</span></div>
+            <input type="range" id="dlThresh" min="100" max="1000" step="20" value="400">
+          </div>
+        </div>
+      </section>
+
+      <!-- OVERRIDE -->
+      <section class="panel" data-panel="override">
+        <div class="panel-head">
+          <div>
+            <h2>Manual <b>override</b></h2>
+            <p>Force the lights on or off right now, regardless of schedule. The override holds for the duration you pick, then control returns to automatic. Every override is logged.</p>
+          </div>
+        </div>
+        <div id="ovInactive" class="field-card editable">
+          <h3 style="margin-bottom:14px;">Set an override</h3>
+          <div class="ov-state">
+            <div class="ov-opt" id="ovOn" data-st="ON">Force ON</div>
+            <div class="ov-opt" id="ovOff" data-st="OFF">Force OFF</div>
+          </div>
+          <div class="time-field" style="margin-bottom:18px;">
+            <label for="ovDur">Hold for</label>
+            <select class="inp" id="ovDur">
+              <option value="60">1 hour</option>
+              <option value="180">3 hours</option>
+              <option value="eod">Until end of day</option>
+              <option value="boundary">Until next schedule boundary</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="applyOv" disabled>Apply override</button>
+        </div>
+        <div id="ovActiveCard" style="display:none;">
+          <div class="ov-active">
+            <div class="oa-txt" id="ovActiveTxt">—</div>
+            <button class="btn btn-danger btn-sm editable" id="clearOv">Clear override</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ACTIVITY -->
+      <section class="panel" data-panel="activity">
+        <div class="panel-head">
+          <div>
+            <h2>Activity <b>log</b></h2>
+            <p>Every configuration change, override, lighting switch, and failure — with who did it and when. Append-only.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="simFail">Simulate a hardware failure</button>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lighting-app.js"></script>
+</body>
+</html>
