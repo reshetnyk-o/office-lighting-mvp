@@ -1,6 +1,6 @@
 # Office Lighting Control — MVP
 
-Interactive prototype of a **self-service, context-aware office lighting control dashboard**, built as part of an Operational Analyst test task.
+Interactive prototype of a **self-service, context-aware office lighting control dashboard**, built as part of an Operations Analyst test task.
 
 **▶ Live demo:** https://reshetnyk-o.github.io/office-lighting-mvp/
 
