@@ -120,7 +120,7 @@
       var why;
       if (skipAllDay) why = "Today is a <b>configured holiday</b> (skip all day).";
       else if (!activeDay && !customWindow) why = "<b>" + DAYS[d] + " is not an active day</b> in the schedule.";
-      else why = "Current time is <b>outside the " + fmtMin(onM) + "–" + fmtMin(offM) + " window</b>.";
+      else why = "Simulated time (" + fmtMin(sim.minutes) + ", set in the Live Simulation panel) is <b>outside the " + fmtMin(onM) + "–" + fmtMin(offM) + " window</b>.";
       result.state = "OFF"; result.reason = why;
       return result;
     }
