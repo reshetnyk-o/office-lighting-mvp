@@ -7,18 +7,23 @@
   "use strict";
 
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  var LS_KEY = "lightingControl.v2";
+  var LS_KEY = "lightingControl.v3";
 
   /* ---------- default state ---------- */
-  function defaults() {
+  function zoneDefaults() {
     return {
-      role: "editor",
-      zone: "Floor 2 — Open space",
       schedule: { on: "09:00", off: "19:00", days: [1, 2, 3, 4, 5] },
       exceptions: [{ date: "2026-06-13", mode: "skip" }],
       occupancy: { enabled: true, timeout: 15 },
       daylight: { enabled: true, threshold: 400 },
-      override: null, // { state:'ON'|'OFF', expiresMin:Number|null, label:String }
+      override: null // { state:'ON'|'OFF', expiresMin:Number|null, label:String }
+    };
+  }
+  function defaults() {
+    return {
+      role: "editor",
+      zone: "Floor 2 — Open space",
+      zones: {}, // per-zone config, created lazily
       sim: { date: "2026-06-10", minutes: 600, occupied: true, lux: 220 },
       log: []
     };
@@ -32,19 +37,22 @@
       if (raw) {
         var parsed = JSON.parse(raw);
         var d = defaults();
-        // shallow-merge to tolerate schema additions
-        return Object.assign(d, parsed, {
-          schedule: Object.assign(d.schedule, parsed.schedule),
-          occupancy: Object.assign(d.occupancy, parsed.occupancy),
-          daylight: Object.assign(d.daylight, parsed.daylight),
-          sim: Object.assign(d.sim, parsed.sim)
-        });
+        var merged = Object.assign(d, parsed, { sim: Object.assign(d.sim, parsed.sim) });
+        merged.zones = parsed.zones || {};
+        merged.role = "editor"; // the role toggle is a demo control — never persisted
+        return merged;
       }
     } catch (e) {}
     var fresh = defaults();
     // seed an opening log entry the first time
     fresh.log = [logEntry("Migrated existing 09:00–19:00 schedule as the starting configuration.", "system", "config")];
     return fresh;
+  }
+
+  /* current zone's config, created from defaults on first access */
+  function z() {
+    if (!state.zones[state.zone]) state.zones[state.zone] = zoneDefaults();
+    return state.zones[state.zone];
   }
 
   function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
@@ -71,7 +79,7 @@
 
   /* ---------- the decision engine (mirrors spec §3.2) ---------- */
   function evaluate() {
-    var s = state, sim = s.sim;
+    var s = z(), sim = state.sim;
     var trace = { override: "off", window: "off", occupancy: "off", daylight: "off", on: "off" };
     var result = { state: "OFF", reason: "", trace: trace };
 
@@ -182,23 +190,24 @@
     lastLit = r.state;
 
     // schedule controls
-    $("#onTime").value = state.schedule.on;
-    $("#offTime").value = state.schedule.off;
+    var c = z();
+    $("#onTime").value = c.schedule.on;
+    $("#offTime").value = c.schedule.off;
     renderDays();
 
     // exceptions
     renderExceptions();
-    $("#excBadge").textContent = state.exceptions.length;
+    $("#excBadge").textContent = c.exceptions.length;
 
     // settings
-    $("#occEnabled").checked = state.occupancy.enabled;
-    $("#occTimeout").value = state.occupancy.timeout;
-    $("#occTimeoutVal").textContent = state.occupancy.timeout + " min";
-    $("#occTimeoutWrap").style.opacity = state.occupancy.enabled ? "1" : ".4";
-    $("#dlEnabled").checked = state.daylight.enabled;
-    $("#dlThresh").value = state.daylight.threshold;
-    $("#dlThreshVal").textContent = state.daylight.threshold + " lux";
-    $("#dlThreshWrap").style.opacity = state.daylight.enabled ? "1" : ".4";
+    $("#occEnabled").checked = c.occupancy.enabled;
+    $("#occTimeout").value = c.occupancy.timeout;
+    $("#occTimeoutVal").textContent = c.occupancy.timeout + " min";
+    $("#occTimeoutWrap").style.opacity = c.occupancy.enabled ? "1" : ".4";
+    $("#dlEnabled").checked = c.daylight.enabled;
+    $("#dlThresh").value = c.daylight.threshold;
+    $("#dlThreshVal").textContent = c.daylight.threshold + " lux";
+    $("#dlThreshWrap").style.opacity = c.daylight.enabled ? "1" : ".4";
 
     // override
     renderOverride();
@@ -225,27 +234,29 @@
         var b = document.createElement("button");
         b.className = "day-pill"; b.textContent = d.charAt(0); b.title = d; b.dataset.d = i;
         b.addEventListener("click", function () {
-          var idx = state.schedule.days.indexOf(i);
-          if (idx === -1) state.schedule.days.push(i); else state.schedule.days.splice(idx, 1);
-          state.schedule.days.sort();
+          var days = z().schedule.days;
+          var idx = days.indexOf(i);
+          if (idx === -1) days.push(i); else days.splice(idx, 1);
+          days.sort();
           render();
         });
         row.appendChild(b);
       });
     }
     Array.prototype.forEach.call(row.children, function (b) {
-      b.classList.toggle("on", state.schedule.days.indexOf(+b.dataset.d) !== -1);
+      b.classList.toggle("on", z().schedule.days.indexOf(+b.dataset.d) !== -1);
     });
   }
 
   function renderExceptions() {
     var list = $("#excList");
+    var c = z();
     list.innerHTML = "";
-    if (state.exceptions.length === 0) {
+    if (c.exceptions.length === 0) {
       list.innerHTML = '<div class="exc-empty">No exceptions set. The regular schedule runs every active day.</div>';
       return;
     }
-    state.exceptions.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (e) {
+    c.exceptions.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (e) {
       var pretty = new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
       var label = e.mode === "skip" ? '<span class="pill bad" style="margin-left:10px;"><span class="dot bad"></span>Lights off all day</span>'
         : '<span class="pill warn" style="margin-left:10px;"><span class="dot warn"></span>Custom ' + e.on + "–" + e.off + "</span>";
@@ -255,8 +266,8 @@
       var del = document.createElement("button");
       del.className = "btn btn-danger btn-sm editable"; del.textContent = "Remove";
       del.addEventListener("click", function () {
-        state.exceptions = state.exceptions.filter(function (x) { return x !== e; });
-        pushLog("Removed exception for " + pretty + ".", "config");
+        c.exceptions = c.exceptions.filter(function (x) { return x !== e; });
+        pushLog("Removed exception for " + pretty + " (" + state.zone + ").", "config");
         toast("Exception removed"); render();
       });
       item.appendChild(del);
@@ -265,10 +276,11 @@
   }
 
   function renderOverride() {
-    var ov = state.override;
+    var c = z();
+    var ov = c.override;
     // lapse expired override
     if (ov && ov.expiresMin != null && state.sim.minutes >= ov.expiresMin) {
-      state.override = null; ov = null;
+      c.override = null; ov = null;
     }
     $("#ovInactive").style.display = ov ? "none" : "block";
     $("#ovActiveCard").style.display = ov ? "block" : "none";
@@ -328,20 +340,22 @@
 
   // schedule
   $("#saveSchedule").addEventListener("click", function () {
-    state.schedule.on = $("#onTime").value;
-    state.schedule.off = $("#offTime").value;
-    var dayNames = state.schedule.days.map(function (i) { return DAYS[i]; }).join(", ") || "no days";
-    pushLog("Updated schedule to " + state.schedule.on + "–" + state.schedule.off + " on " + dayNames + ".", "config");
+    var on = $("#onTime").value, off = $("#offTime").value;
+    if (!on || !off) { toast("Set both ON and OFF times first"); render(); return; }
+    if (toMin(on) >= toMin(off)) { toast("OFF time must be later than ON time"); render(); return; }
+    var c = z();
+    c.schedule.on = on;
+    c.schedule.off = off;
+    var dayNames = c.schedule.days.map(function (i) { return DAYS[i]; }).join(", ") || "no days";
+    pushLog("Updated " + state.zone + " schedule to " + on + "–" + off + " on " + dayNames + ".", "config");
     $("#schedSaved").classList.add("show");
     setTimeout(function () { $("#schedSaved").classList.remove("show"); }, 2000);
     toast("Schedule saved — live in ~1 min");
     render();
   });
-  $("#onTime").addEventListener("input", function () { state.schedule.on = this.value; });
-  $("#offTime").addEventListener("input", function () { state.schedule.off = this.value; });
   $("#resetSchedule").addEventListener("click", function () {
-    state.schedule = { on: "09:00", off: "19:00", days: [1, 2, 3, 4, 5] };
-    pushLog("Reset schedule to default (09:00–19:00, Mon–Fri).", "config");
+    z().schedule = { on: "09:00", off: "19:00", days: [1, 2, 3, 4, 5] };
+    pushLog("Reset " + state.zone + " schedule to default (09:00–19:00, Mon–Fri).", "config");
     toast("Schedule reset"); render();
   });
 
@@ -352,11 +366,16 @@
   $("#addExc").addEventListener("click", function () {
     var date = $("#excDate").value;
     if (!date) { toast("Pick a date first"); return; }
-    if (state.exceptions.some(function (e) { return e.date === date; })) { toast("That date already has an exception"); return; }
+    var c = z();
+    if (c.exceptions.some(function (e) { return e.date === date; })) { toast("That date already has an exception"); return; }
     var mode = $("#excMode").value;
     var ex = { date: date, mode: mode };
-    if (mode === "custom") { ex.on = $("#excOn").value; ex.off = $("#excOff").value; }
-    state.exceptions.push(ex);
+    if (mode === "custom") {
+      ex.on = $("#excOn").value; ex.off = $("#excOff").value;
+      if (!ex.on || !ex.off) { toast("Set both custom ON and OFF times"); return; }
+      if (toMin(ex.on) >= toMin(ex.off)) { toast("Custom OFF must be later than ON"); return; }
+    }
+    c.exceptions.push(ex);
     var pretty = new Date(date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     pushLog("Added " + (mode === "skip" ? "skip" : "custom-hours") + " exception for " + pretty + ".", "config");
     toast("Exception added"); render();
@@ -364,20 +383,20 @@
 
   // settings
   $("#occEnabled").addEventListener("change", function () {
-    state.occupancy.enabled = this.checked;
-    pushLog("Occupancy auto-off turned " + (this.checked ? "on" : "off") + ".", "config");
+    z().occupancy.enabled = this.checked;
+    pushLog("Occupancy auto-off turned " + (this.checked ? "on" : "off") + " (" + state.zone + ").", "config");
     render();
   });
   $("#occTimeout").addEventListener("input", function () {
-    state.occupancy.timeout = +this.value; $("#occTimeoutVal").textContent = this.value + " min"; render();
+    z().occupancy.timeout = +this.value; $("#occTimeoutVal").textContent = this.value + " min"; render();
   });
   $("#dlEnabled").addEventListener("change", function () {
-    state.daylight.enabled = this.checked;
-    pushLog("Daylight (natural light) mode turned " + (this.checked ? "on" : "off") + ".", "config");
+    z().daylight.enabled = this.checked;
+    pushLog("Daylight (natural light) mode turned " + (this.checked ? "on" : "off") + " (" + state.zone + ").", "config");
     render();
   });
   $("#dlThresh").addEventListener("input", function () {
-    state.daylight.threshold = +this.value; $("#dlThreshVal").textContent = this.value + " lux"; render();
+    z().daylight.threshold = +this.value; $("#dlThreshVal").textContent = this.value + " lux"; render();
   });
 
   // override
@@ -392,32 +411,35 @@
   $("#ovOff").addEventListener("click", function () { pickOv("OFF"); });
   $("#applyOv").addEventListener("click", function () {
     if (!ovChoice) return;
+    var c = z();
     var dur = $("#ovDur").value, expiresMin = null, label;
     if (dur === "eod") { expiresMin = 1439; label = "until end of day"; }
     else if (dur === "boundary") {
-      var onM = toMin(state.schedule.on), offM = toMin(state.schedule.off);
+      var onM = toMin(c.schedule.on), offM = toMin(c.schedule.off);
       var next = [onM, offM].filter(function (m) { return m > state.sim.minutes; }).sort(function (a, b) { return a - b; })[0];
       expiresMin = next != null ? next : 1439;
       label = "until " + fmtMin(expiresMin);
     } else {
-      expiresMin = state.sim.minutes + (+dur);
+      // cap at end of the simulated day — the sim clock never crosses midnight
+      expiresMin = Math.min(state.sim.minutes + (+dur), 1439);
       label = "for " + (+dur / 60) + "h (until " + fmtMin(expiresMin) + ")";
     }
-    state.override = { state: ovChoice, expiresMin: expiresMin, label: label };
-    pushLog("Manual override: forced " + ovChoice + " " + label + ".", "override");
+    c.override = { state: ovChoice, expiresMin: expiresMin, label: label };
+    pushLog("Manual override: forced " + ovChoice + " " + label + " (" + state.zone + ").", "override");
     toast("Override applied");
     ovChoice = null; $("#ovOn").classList.remove("sel-on"); $("#ovOff").classList.remove("sel-off"); $("#applyOv").disabled = true;
     render();
   });
   $("#clearOv").addEventListener("click", function () {
-    pushLog("Manual override cleared — control returned to automatic.", "override");
-    state.override = null; toast("Override cleared"); render();
+    pushLog("Manual override cleared — control returned to automatic (" + state.zone + ").", "override");
+    z().override = null; toast("Override cleared"); render();
   });
 
   // failure simulation
   $("#simFail").addEventListener("click", function () {
-    state.log.unshift({ ts: now(), who: "System", type: "alert", text: "⚠ Lighting command failed — controller for " + state.zone + " did not confirm state change. Alert sent to #facilities (within 5-min SLA)." });
-    renderLog(); toast("Failure alert raised");
+    state.log.unshift(logEntry("⚠ Lighting command failed — controller for " + state.zone + " did not confirm state change. Alert sent to #facilities (within 5-min SLA).", "System", "alert"));
+    if (state.log.length > 60) state.log.length = 60;
+    renderLog(); save(); toast("Failure alert raised");
   });
 
   // simulation inputs
