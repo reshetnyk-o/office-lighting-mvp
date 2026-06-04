@@ -130,11 +130,11 @@
           <div class="time-inputs">
             <div class="time-field">
               <label for="onTime">Turn ON time</label>
-              <input type="time" id="onTime" value="09:00">
+              <input type="text" class="inp-time" id="onTime" value="09:00" placeholder="09:00" inputmode="numeric" maxlength="5" spellcheck="false" autocomplete="off" title="24-hour format, HH:MM">
             </div>
             <div class="time-field">
               <label for="offTime">Turn OFF time</label>
-              <input type="time" id="offTime" value="19:00">
+              <input type="text" class="inp-time" id="offTime" value="19:00" placeholder="19:00" inputmode="numeric" maxlength="5" spellcheck="false" autocomplete="off" title="24-hour format, HH:MM">
             </div>
           </div>
         </div>
@@ -172,7 +172,7 @@
             <div class="time-field" id="excCustomWrap" style="display:none;">
               <label for="excCustom">Custom hours</label>
               <div style="display:flex;gap:8px;">
-                <input type="time" id="excOn" value="10:00"><input type="time" id="excOff" value="16:00">
+                <input type="text" class="inp-time" id="excOn" value="10:00" placeholder="10:00" inputmode="numeric" maxlength="5" spellcheck="false" autocomplete="off" title="24-hour format, HH:MM"><input type="text" class="inp-time" id="excOff" value="16:00" placeholder="16:00" inputmode="numeric" maxlength="5" spellcheck="false" autocomplete="off" title="24-hour format, HH:MM">
               </div>
             </div>
             <button class="btn btn-primary" id="addExc" style="flex:none;">Add date</button>

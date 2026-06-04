@@ -59,6 +59,13 @@
 
   /* ---------- helpers ---------- */
   function toMin(hhmm) { var p = hhmm.split(":"); return (+p[0]) * 60 + (+p[1]); }
+  /* normalize a 24h "HH:MM" text value; returns null if invalid */
+  function normTime(v) {
+    v = (v || "").trim().replace(/[.,]/, ":");
+    var m = v.match(/^(\d{1,2}):([0-5]\d)$/);
+    if (!m || +m[1] > 23) return null;
+    return (+m[1] < 10 ? "0" + +m[1] : "" + m[1]) + ":" + m[2];
+  }
   function fmtMin(m) {
     m = ((m % 1440) + 1440) % 1440;
     var h = Math.floor(m / 60), mm = m % 60;
@@ -341,8 +348,8 @@
 
   // schedule
   $("#saveSchedule").addEventListener("click", function () {
-    var on = $("#onTime").value, off = $("#offTime").value;
-    if (!on || !off) { toast("Set both ON and OFF times first"); render(); return; }
+    var on = normTime($("#onTime").value), off = normTime($("#offTime").value);
+    if (!on || !off) { toast("Use 24-hour time, e.g. 09:00"); render(); return; }
     if (toMin(on) >= toMin(off)) { toast("OFF time must be later than ON time"); render(); return; }
     var c = z();
     c.schedule.on = on;
@@ -372,8 +379,8 @@
     var mode = $("#excMode").value;
     var ex = { date: date, mode: mode };
     if (mode === "custom") {
-      ex.on = $("#excOn").value; ex.off = $("#excOff").value;
-      if (!ex.on || !ex.off) { toast("Set both custom ON and OFF times"); return; }
+      ex.on = normTime($("#excOn").value); ex.off = normTime($("#excOff").value);
+      if (!ex.on || !ex.off) { toast("Use 24-hour time, e.g. 10:00"); return; }
       if (toMin(ex.on) >= toMin(ex.off)) { toast("Custom OFF must be later than ON"); return; }
     }
     c.exceptions.push(ex);
