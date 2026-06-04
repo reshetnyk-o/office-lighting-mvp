@@ -2,7 +2,7 @@
 
 Interactive prototype of a **self-service, context-aware office lighting control dashboard**, built as part of an Operational Analyst test task.
 
-**▶ Live demo:** https://OWNER.github.io/office-lighting-mvp/
+**▶ Live demo:** https://reshetnyk-o.github.io/office-lighting-mvp/
 
 ## What it demonstrates
 
